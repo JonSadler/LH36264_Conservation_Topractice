@@ -1,0 +1,271 @@
+---
+title: "Workshop 2 - [Week 5] comparing means - solutions"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk [little green triangle] or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+Notebook code chunks can be inserted quickly using the keyboard shortcut Ctrl + Alt + I (macOS: Cmd + Option + I ), or via the Insert menu in the editor toolbar.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+CLASS EXERCISE
+NOTE: this is free text so you do not need to use a # tag. Unless you are putting notes in the code windows [see below]
+
+Load the libraries we might need [NOTE: may need to install these. Check the packages list in the bottom right pane of the RStudio window] 
+```{r}
+library(tidyverse) # has library dplyr in in
+library(ggfortify) # has the autoplot function for creating the validation plots
+library(car) # for kruskal-Wallis test
+library(coin) # for the Wilcox non-parametric test
+```
+When you attempt to save R might ask for an undated version of R markdowm. That's fine, say "yes".
+
+Do the following for all three data files:
+1. load in the data and examine it's structure (including experimental balance)
+2. Posit your hypotheses (null and alternative)
+3. play with some pictures
+4. draw a contingency table to figure out how the data are structured
+5. Select an appropriate model
+6. Validate the model
+7. Briefly interpret the results - in your script file!!!!
+
+EXERCISE 1
+-----------------------------------------------------------------------------------------
+Filename: Hoglouse.csv - a file of water louse distribution along a rivers in Devon
+response - hoglouse numbers/abundance
+explanatory variable - Upper, Mid and lower sites (i.e.  longitudinal profile)
+see Gardner's book....on the reading lists
+----------------------------------------------------------------------------------------
+```{r}
+Hog <- read.csv("Hoglouse.csv", header=TRUE)
+```
+Look at its structure
+```{r}
+glimpse(Hog) #in the dplyr library
+str(Hog)
+```
+Note there is a character class variable i.e. site. Our tests might not run with this so we'll convert it to a factor
+
+```{r}
+View(Hog)
+```
+
+```{r}
+Hog$FSite <- as.factor(Hog$Site)
+```
+
+Make a picture - to look at the structure
+
+```{r}
+boxplot(Hog$Count ~ Hog$ Site, col = "powderblue", xlab="Site location", ylab = "Abundance") # Not symetrical so not normally distributed
+```
+Repeated with the ggplot2. As I have said numerous time, what you use to plot i.e. base R or ggplot2 is up to you. 
+
+```{r}
+ggplot(Hog, aes(Site, Count)) + geom_boxplot() #+ xlab("Site location") + ylab("Abundance"))
+```
+
+Check normality with histogram and QQ-plot
+
+```{r}
+par(mfrow = c(2, 1))
+hist(Hog$Count, main = "", col = "red", xlab = "Count")
+qqnorm(Hog$Count); qqline(Hog$Count)
+```
+Doesn't look promising for normality - check with shapiro-Wilkes test
+```{r}
+shapiro.test(Hog$Count)
+```
+Nope - not normally distributed. What about heterogeneity of variances....?
+```{r}
+leveneTest(Hog$Count, Hog$Site) # looks fine
+```
+
+```{r}
+Upper <- subset(Hog, Site == "Upper")
+Mid <- subset(Hog, Site == "Mid")
+Lower <- subset(Hog, Site == "Lower")
+var(Upper$Count)
+var(Mid$Count)
+var(Lower$Count)
+```
+We conclude the data are not normally distributed with homogeneity of variance marginal = needs a non-parametric test
+```{r}
+kruskal.test(Hog$Count ~ Hog$Site)
+```
+Interpretation:
+Big difference between the means, especially in the mid regions of the river.
+We can examine the differences in the individual means [someone in class asked about this - great idea!]. We do this by using Wilcox tests to compare the individual pairwise comparisons ie:
+Upper to Mid
+Mid to Lower
+Upper to Lower
+To do this we three new dataframes with the appropriate "Site" rows comparisons
+```{r}
+Upper_Mid = filter(Hog,Site %in% c("Upper","Mid")) # uses dplyr to subset using multiple criteria
+Mid_Lower = filter(Hog,Site %in% c("Mid","Lower"))
+Upper_Lower = filter(Hog,Site %in% c("Upper","Lower"))
+```
+The key to this command is the 'filter' function [from the dplyr library] and the use of the %in% in conjunction with the c() function. It quite literally says " filter using dataframe 'Hog' and column 'Site', extracting only the rows where the criterion is met. So for in the first example, it will only select rows in the site column that have either "Upper" or "Lower" in them. Now run the multiple comparisons to simulate the Tukey test.
+
+```{r}
+wilcox_test(Count ~ Site, data = Upper_Mid, distribution = "exact") 
+wilcox_test(Count ~ Site, data = Mid_Lower, distribution = "exact") 
+wilcox_test(Count ~ Site, data = Upper_Lower, distribution = "exact") 
+```
+We find:
+Upper to mid comparison has a sig difference p-value = 0.01263
+Lower to Mid - not sig at p-value = 0.07937. Close but not below P=<0.05
+Lower to Upper not sig at p-value = 0.9747.
+So our finding of Kruskal-Wallis chi-squared = 6.5396, df = 2, p-value = 0.03801 is being driven by one difference in the paired means: Upper to Mid. 
+
+EXERCISE 2
+-----------------------------------------------------------------------------------------
+Filename: Medley.csv
+Medley and Clements (1998) investigated the impact of zinc contamination (and other
+heavy metals) on the diversity of diatom species in the USA Rocky Mountains (from
+Box 8.1 of Quinn and Keough (2002))
+File contents:
+DIATOM - number of different species of diatoms on the a known area of rocks in streams (continous variable)
+ZINC - mpm of zinc in the water column (background, low, medium, high) (factor - explanatory variable)
+
+----------------------------------------------------------------------------------------
+
+```{r}
+Algal <- read.csv("Medley.csv")
+```
+
+```{r}
+glimpse(Algal)
+```
+note ZINC is a character and need to be a factor
+
+```{r}
+Algal$ZINC <-as.factor(Algal$ZINC)
+```
+check it is now a factor
+```{r}
+glimpse(Algal)
+```
+Make some pictures - test for normality
+```{r}
+par(mfrow=c(1,2))
+boxplot(DIVERSITY ~ ZINC, data = Algal, col = "blue", ylab = "Diversity")
+qqnorm(Algal$DIVERSITY); qqline(Algal$DIVERSITY)
+```
+Shapiro-wilkws test
+```{r}
+shapiro.test(Algal$DIVERSITY)
+```
+Looks fine \oo/
+
+Variances.....?
+```{r}
+leveneTest(Algal$DIVERSITY, Algal$ZINC)
+```
+All good.
+
+One-way ANOVA is appropriate do we see a difference?
+```{r}
+summary(aov(DIVERSITY ~ ZINC, data = Algal)) # Note we can nest the summary command in the Anova call
+```
+or put into an object to use later
+```{r}
+Model <- aov(DIVERSITY ~ ZINC, data = Algal)
+summary(Model)
+```
+Interpretation:
+ZINC levels impact the diversity of the diatom communities
+All other factors (e.g. flow, nutrient status, pH) being stable
+Extra bonus mark if you used a Tukey posthoc test to examine the difference between the means
+```{r}
+TukeyHSD(Model)
+```
+EXERCISE 3
+-----------------------------------------------------------------------------------------
+Filename: Quinn.csv (data from By G. P. Quinn and M. J. Keough, 2002 - "Experimental Design and Data Analysis for Biologists" )
+File contents:
+DENSITY - Limpet density treatment (L1 = 8 individals per 225 cm2 enclosure, L2 = 15, L3 = 30 and L4 = 45) (factor - explanatory variable)
+SEASON - Season of the year (Spring or summer) (factor - explanatory variable)
+EGGS - egg production by limpets (continous response variable)
+---------------------------------------------------------------------------------------
+
+We're going to use a two-way ANOVA to analyse this....
+
+```{r}
+Limpet <- read.csv("Quinn.csv")
+```
+check structure
+```{r}
+glimpse(Limpet)
+```
+
+Change SEASON and DENSITY to factors
+```{r}
+Limpet$DENSITY <- as.factor(Limpet$DENSITY)
+Limpet$SEASON <- as.factor(Limpet$SEASON)
+```
+Plot it to see the pattern
+```{r}
+
+par(mfrow=c(1,2))
+plot(EGGS ~ DENSITY, data = Limpet, pch = 19,cex = 1.5,
+     ylab = list("Eggs Produced", cex = 1.2))
+
+plot(EGGS ~ SEASON, data = Limpet, pch = 19,cex = 1.5,
+     ylab = list("Eggs Produced", cex = 1.2))
+```
+both indicate likely differences for each factor. Data look relatively normal
+
+Check assumptions
+normality
+```{r}
+qqnorm(Limpet$EGGS); qqline(Limpet$EGGS)
+```
+Looks fine....
+
+```{r}
+shapiro.test(Limpet$EGGS)
+```
+Data are normally distributed...
+
+check for homogeneity of variance
+```{r}
+leveneTest(EGGS~DENSITY, data = Limpet)
+leveneTest(EGGS~SEASON, data = Limpet)
+
+```
+All fine....to do it graphically and account for both factors we need to run the model!
+
+plot interaction
+```{r}
+interaction.plot(Limpet$DENSITY, Limpet$SEASON, Limpet$EGGS, fun = mean)
+```
+No indication of interactions
+
+Run ANOVA with full interactions
+```{r}
+Limpet_aov <- aov(EGGS ~ SEASON * DENSITY, data = Limpet)
+```
+Look at the output
+```{r}
+summary(Limpet_aov)
+```
+Results indicate that SEASON and DENSITY impact egg production. There is no interaction between the two explanatory factors. 
+
+Confirm all diagnostics
+```{r}
+par(mfrow = c(2, 2)) # set graphics device toplot four graphs in a 2 x 2 matrix
+plot(Limpet_aov)
+```
+
+Or we can use the autoplot function from the ggfortify library and it does all the formatting for us! We don't need to use the par() functions. As always - it is up to you which route you adopt or choose!
+
+```{r}
+autoplot(Limpet_aov) # called from ggfortify library
+```
+No visible issues! Looks excellent.

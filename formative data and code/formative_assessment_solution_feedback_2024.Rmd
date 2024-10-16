@@ -1,0 +1,237 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+Formative exercise solution
+Jon Sadler 2nd March 2021
+
+Load libraries we need.
+```{r}
+library(tidyverse)
+library(car)
+library(broom) # new library you might need to install it. Needed for some clever stuff below
+library(knitr) # new library you might need to install it. Needed for some clever stuff below
+library(kableExtra) # new library you might need to install it. Needed for some clever stuff below
+library(magrittr) # new library you might need to install it. Needed for some clever stuff below
+library(ggpubr) # new library you might need to install it. Clever organisation of ggplots. We will use it below. 
+library(jpeg) # new library you might need to install it. Allows loadong of jpeg images into R
+library(ggtext) # new library you might need to install it. Allows extensive text rendering of ggplots. We will use it below. 
+```
+
+Load data
+needs to be in your working directory
+```{r}
+# setwd("/Users/jonathansadler/Dropbox/My Mac (Jonathans-MacBook-Pro.local)/Desktop")
+pred <- read.csv("fish_pred.csv")
+```
+Look data
+```{r}
+glimpse(pred)
+```
+
+We see that the bullhead/loach columns are character fields you'll not get all the validation plots if you don't use factors
+
+change character fields to factors 
+```{r}
+pred$Bullhead <- as.factor(pred$Bullhead)
+pred$Loach <- as.factor(pred$Loach)
+glimpse(pred) # check it worked
+```
+
+Check for balance necessary for a two-way ANOVA
+```{r}
+table(pred$Bullhead, pred$Loach)
+```
+Fine so we can go with 2 way ANOVA (as we have one response and two FACTORS). Note - the fish are either present or absent, both present or both absent (a control)
+
+Draw some pictures - B=boxplots
+```{r}
+op <- par(mfrow = c(1, 2)) # 1 row , 2 columns for the images
+boxplot(Density ~ Bullhead, col = "lightblue", data = pred, xlab = "Bullhead")
+boxplot(Density ~ Loach, col = "lightblue", data = pred, xlab = "Loach")
+par(op)
+```
+
+Or in ggplot - need to transform the data to a long format to do this easily
+```{r}
+pred_long <- pred %>% gather(species,treatment, 1:2)
+glimpse(pred_long) # looks fine we'll flip new variables to factors as we're going to create error bars plots 
+pred_long <- pred_long %>% mutate(species = factor(species),treatment = factor(treatment)) # use glimpse(pred_long) to check it worked
+```
+
+```{r}
+ggplot(pred_long, aes(y=Density, x=species, fill=treatment)) + geom_boxplot() +
+  labs(x = "Fish species", y = "Prey Density", fill = "Treatment")
+```
+
+Variances look okay and the pattern indicates that Loach reduce midge density but Bullheads don't. The theme_bw() overrides the base grey colours [delete it and rerun the code and you'll see]
+
+Check assumptions 1. normality
+```{r}
+qqnorm(pred$Density); qqline(pred$Density)
+shapiro.test(pred$Density)
+```
+Data are normally distributed....
+
+Assumption 2. Homogeneity of variance
+```{r}
+leveneTest(pred$Density ~ pred$Bullhead * pred$Loach) # No issues visible
+```
+
+Plot interaction
+```{r}
+interaction.plot(pred$Bullhead, pred$Loach, pred$Density, col=c(2,3), xlab = "Predators", ylab = "Midge Density", trace.label = "")
+```
+Indicates no interaction but it is sensible to include the interaction in the plot anyway
+
+Run ANOVA
+```{r}
+pred_aov <- aov(Density ~ Loach * Bullhead, data = pred)
+```
+
+Look at the output
+```{r}
+summary(pred_aov)
+```
+
+Results indicate that Loach reduces midge density but bullheads don't. There is no interaction between the two explanatories (or the fish), so the addition of bullheads to the cages did not result in greater impact on midge density.
+
+We can use the tidy function in the broom library to make a flashier table of results
+
+```{r}
+tidy(pred_aov)
+```
+Note: this actually creates a dataframe or tibble. So we can add to an object for later use, such as saving to a file or generating a table in word format [which we'll do below].
+
+```{r}
+Fish_table <- tidy(pred_aov)
+```
+
+Now the last step is to confirm all diagnostics [Remember you can use the autoplot function too, but you'll need to load the ggfortify library]. If you get a 'figure margins are too large' error, the expand the code window (this one), as it writes to here not the windown in bottom right.
+
+```{r}
+op <- par(mfrow = c(2, 2)) # set graphics device to plot four graphs in a 2 x 2 matrix
+plot(pred_aov)
+par(op)
+```
+No big issues. There are no worrying patterns in residuals data point 13 stands out. We'll look at it via leverage/Cook's Distance outlier plots.
+
+```{r}
+plot(pred_aov, which=6) # plots leverage and cook's plot
+```
+It's dancing on the margin but okay.....
+Plot barchart with error bars to show the pattern for a report - we'll go for a publication level type file and output it to a file at high resolution. 
+
+We'll use ggplot and the reshaped dataframe pred_long. But first we need the elements for the plot [we did this in workshop 3 - check your notes]
+
+Calculates mean, sd, se and ci. If you do not know the error bars relate to then this is a good little paper to get you started:
+J Cell Biol (2007) 177 (1): 7–11. https://doi.org/10.1083/jcb.200611141
+
+```{r}
+pred_sum <- pred_long %>%
+  group_by(species,treatment) %>%
+  summarise( 
+    n=n(),
+    mean=mean(Density),
+    sd=sd(Density)) %>%
+  mutate( se=sd/sqrt(n))  %>% # computes the standard error
+  mutate( ic=se * qt((1-0.05)/2 + .5, n-1)) # computes 95% CI
+```
+
+plot using 2 standard error [at 95% or p=0.05 level]. Note: errors don't overlap for Loach
+```{r}
+ggplot(pred_sum, aes(x=species, y=mean, fill=treatment)) +
+  geom_bar(position=position_dodge(), stat="identity", colour='black') +
+  geom_errorbar(aes(ymin=mean-2*se, ymax=mean+2*se), width=.2,position=position_dodge(.9)) + 
+  labs(x = "Fish species", y = "Prey Density", fill = "Treatment") + theme_bw()
+```
+
+or displayed with confidence intervals - see they don't overlap for loach but are little larger
+```{r}
+ggplot(pred_sum, aes(x=species, y=mean, fill=treatment)) +
+  geom_bar(position=position_dodge(), stat="identity", colour='black') +
+  geom_errorbar(aes(ymin=mean-ic, ymax=mean+ic),width=.2,position=position_dodge(.9)) + 
+  labs(x = "Fish species", y = "Prey Density", fill = "Treatment") + theme_bw()
+```
+```{r}
+ggplot(pred_sum, aes(x=species, y=mean, fill=treatment)) +
+  geom_bar(position=position_dodge(), stat="identity", colour='black') +
+  geom_errorbar(aes(ymin=mean-ic, ymax=mean+ic),width=.2,position=position_dodge(.9)) + 
+  labs(x = "Fish species", y = "Prey Density", fill = "Treatment") 
+```
+NOTE you need the position=position.dodge function to locate the error bars over the middle of the bars. The width function scales the width of the error bar = trying playing with it to see.
+
+Now for a publication ready plot!
+```{r}
+ggplot(pred_sum, aes(x=species, y=mean, fill=treatment)) +
+  geom_bar(position=position_dodge(), stat="identity", colour='black') +
+  geom_errorbar(aes(ymin=mean-ic, ymax=mean+ic),width=.2,position=position_dodge(.9)) + 
+  theme_bw() + # remove default grey background
+  scale_fill_manual(values = c("grey90","grey50")) + # override colours for treatment making them grey and white bars
+  theme(axis.title = element_text(size = 12), # sets axis title font size
+        panel.grid.major = element_blank(), # remove default major panel lines
+        panel.grid.minor = element_blank(), # remove default minor panel lines
+        axis.text.x  = element_text(size=10, colour="black"), # set axis font size and colour [default colour is grey]
+        axis.text.y  = element_text(size=10, colour="black"), # as above but for y axis
+        plot.caption=element_text(hjust = 0)) + #set caption alignment to the left [defaults to the right]
+  labs(x = "Species", y = expression(Prey~Density~(m^2)), fill = "Treatment", 
+       caption = "Figure 1. Species impacts on prey density in experiment enclosures. n = 10 per treatment group (total = 40)\n** = p<0.001, NS = not significant") +
+  # to add significant level use the annotate function. Check the aov call for sig levels
+  annotate("text", x=2, y=4.2, label= "**") +
+  annotate("text", x=1, y=4.2, label= "NS")
+# y axis is scaled in y axis units
+# x axis has two units relating to the two species
+```
+Jazz up the x axis, add a title and modify the caption
+```{r}
+# create labels for fish
+  lab_bull <- "Bullhead (*Cottus gobio*)" # uses ggtext functions allowing markdown language
+  lab_loach <- "Loach (*Barbatula babartula*)" # uses ggtext functions allowing markdown language
+ggplot(pred_sum, aes(x=species, y=mean, fill=treatment)) +
+  geom_bar(position=position_dodge(), stat="identity", colour='black') +
+  geom_errorbar(aes(ymin=mean-ic, ymax=mean+ic),width=.2,position=position_dodge(.9)) + 
+  theme_bw() + # remove default grey background
+  scale_fill_manual(values = c("grey90","grey50")) + # override colours for treatment making them grey and white bars
+  theme(axis.title = element_text(size = 12), # sets axis title font size
+        panel.grid.major = element_blank(), # remove default major panel lines
+        panel.grid.minor = element_blank(), # remove default minor panel lines
+        #axis.text.x  = element_blank(),
+        axis.text.y  = element_text(size=10, colour="black"), # as above but for y axis
+        plot.caption=element_text(hjust = 0))+
+  scale_x_discrete(
+    name = NULL,
+    labels = labels) + #set caption alignment to the left [defaults to the right]
+  labs(title = "Figure 1. Species impacts on prey density in experiment enclosures", x = "Species", y = expression(Prey~Density~(m^2)), fill = "Treatment", 
+       caption = "n = 10 per treatment group (total = 40), ** = p<0.001, NS = not significant") +
+# to add significant level use the annotate function. Check the aov call for sig levels
+  annotate("text", x=2, y=4.2, label= "**") +
+# y axis is scaled in y axis units
+# x axis has two units relating to the two species
+  annotate("text", x=1, y=4.2, label= "NS") +
+  geom_richtext(fill = NA, label.color = NA, x = 1, y = -.5, label = lab_bull) + # uses ggtext function geom_richtext
+  geom_richtext(fill = NA, label.color = NA, x = 2, y = -.5, label = lab_loach) # uses ggtext function geom_richtext
+```
+Simply omit the caption or title depending on what you want. 
+
+You can add images of the fish too if you wish...[something to play with..] 
+
+Save the plot [will default to your working directory and using the last plot you created]
+```{r}
+ggsave("Fish_pred_plot.pdf", height = 15, width=15, units="cm", dpi = 500)
+```
+Notes on ggsave function [from ggplot]:
+filename "myfilename" needs a suffix or it won't know what it is plotting. So .pgn, .jpg, .pdf etc
+height, width and units are self-explanatory,
+dpi sets the resolution. Bigger numbers = greater resolution.
+
+Support the plot with a nicely formatted table using kable, kableExtra and knitr libraries. This uses the tibble you created earlier based on the ANOVA output
+```{r}
+Fish_table %>%
+  kbl(caption = "Table 1: ANOVA output") %>%
+  kable_classic(full_width = T, html_font = "Helvetica")
+```
+If you highlight this table you can paste it into a word document directly using the edit -> paste special -> HTML format menu options directly in word.

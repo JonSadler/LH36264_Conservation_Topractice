@@ -1,0 +1,239 @@
+---
+title: "Workshop 4 - Multivariate regression in R [Solutions]"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+**************************************
+PART FOUR: CLASS EXERCISES           *
+**************************************
+#
+1.  Use the ozone.data.csv datafile:
+# 		(a) use the datafile called airquality;
+#		(b) explore the data to look at its structure, normality, linearity, heterogeneity;
+#		(c) create coplots to look for interactions between the variables;
+# 		(d) create a multiplicative linear model to illustrate the what factors influences ozone levels in the city;
+#		(e) Use model averaging to select the most parsimonious model;
+#		(f) validate the 'best' model;
+#		(g) create the predictive model and generate the regression equation.
+
+#ozone.data.csv DATAFILE CONTENTS:
+# Based on Daily readings of the following air quality values for May 1, 1973 (a Tuesday)
+# to September 30, 1973 in New York.
+# 
+# Response - ozone: Mean ozone in parts per billion from 1300 to 1500 hours at Roosevelt Island
+# Explanatory - rad: Solar radiation in Langleys in the frequency band 4000–7700 Angstroms from 0800-1200 hours at Central Park
+# Explanatory - wind: Average wind speed in miles per hour at 0700 and 1000 hours at LaGuardia Airport
+# Explanatory - temp: Maximum daily temperature in degrees Fahrenheit at La Guardia Airport
+
+Load your libraries
+```{r}
+library(tidyverse) # for wrangling
+library(ggfortify)
+library(car)
+library(MuMIn)
+```
+
+
+# Load file (you already have the data!): File is ozone.data.csv
+```{r}
+Ozone <- read.csv(file.choose(), header = TRUE)
+```
+# look at data structure
+
+```{r}
+glimpse(Ozone)
+```
+
+# Draw pictures to explore it....
+# Boxplots - normality
+```{r}
+op <- par(mfrow = c(2,2))
+boxplot(Ozone$ozone, ylab="Ozone")
+boxplot(Ozone$rad, ylab = "Solar Radiation")
+boxplot(Ozone$wind, ylab = "Wind")
+boxplot(Ozone$temp, ylab = "Temperature")
+par(op)
+```
+# Generally okay; wind and ozone have a few extreme values but it should be fine
+# relationships between response and explanatories
+
+```{r}
+scatterplotMatrix(~ozone + rad + wind + temp, data = Ozone, diagonal = list(method = "qqplot")) # use qqplot not boxplot
+```
+# Mixture of humped and linear x/Y relationships. 
+# Ozone ~ rad looks quadratic....ozone and rad slightly off normal. 
+# Might consider log10 transform if models are a mess.
+# QQplots indicate that O2 and rad are a problem
+
+# generate first full model using linear function. The full model uses all the interactions.
+```{r}
+M1 <- lm(ozone ~ rad * wind * temp, data = Ozone)
+```
+# look at summary
+```{r}
+summary(M1)
+```
+# Nothing appears to be significant. 
+# need to simplify this a little....but first we need to check for inflationary values
+# Note that any exponent will lead to inflation....
+
+```{r}
+vif(lm(ozone ~ rad * wind * temp, data = Ozone))
+```
+# but interaction terms are huge so remove the 3-way and largest 2-ways ones.
+vif(lm(ozone ~ rad + wind + temp+ wind:temp, data = Ozone))
+# Chuck out wind as it is huge leaving the interaction with wind and temp.
+# Our understanding how wind impacts temperature and ozone production suggests this is sensible.
+
+```{r}
+vif(lm(ozone ~ rad + temp + wind:temp, data = Ozone))
+```
+# no issues
+
+```{r}
+M2 <- lm(ozone ~ rad + temp + wind:temp, data = Ozone)
+summary(M2)
+```
+#validate
+```{r}
+op <- par(mfrow = c(2,2))
+plot(M2)
+par(op)
+```
+# ggfortify autoplot
+```{r}
+autoplot(M2)
+```
+# It's a mess.....heterogeneous residuals [see the clear wedge shape?] and not especially normally distributed
+
+# Use MuMIn to sort out the modelling - note the options commmand must sit within the script window otherwise it will not work
+```{r}
+options(na.action=na.fail) # set options in Base R concerning missing values
+M3 <- model.avg(dredge(M2, rank = "AICc")) # code introduces model.avg(), get.models and dredge functions
+options(na.action = "na.omit") # reset base R options
+summary(M3)
+```
+# best models > 2 AICc includes ALL variables, so it is no different from the one above
+# As a result the residuals are still a mess...
+
+# AT THIS POINT WE MIGHT REFLECT ON HOW WE MODEL THESE DATA AND ADD IN SOME QUADRATICS AND MAYBE USE
+# GENERALISED LINEAR APPROACHES, SUCH AS POISSON REGRESSION. BUT WE'LL COME ONTO THAT IN THE NEXT FEW WEEKS
+# we go back to a linear model and transform the response 
+
+```{r}
+M4 <- lm(log10(ozone) ~ rad + temp + wind:temp, data = Ozone)
+summary(M4)
+```
+
+# Validate the model
+```{r}
+op <- par(mfrow = c(2,2))
+plot(M4)
+par(op)
+```
+# ggfortify autoplot
+```{r}
+autoplot(M4)
+```
+
+# looks pretty good...
+# plot residuals against explanatory variables....
+
+```{r}
+op <- par(mfrow = c(2,2)) # We cannot use the exponents here!
+plot(M4$resid ~ Ozone$rad) 	# Looks okay
+plot(M4$resid ~ Ozone$temp)	# Looks okay
+plot(M4$resid ~ Ozone$wind)	# Looks okay
+par(op)
+```
+# We could now do some plotting / prediction.....but I'll leave that code up to you
+
+# NOTE: you'll get a very similar outcome if you model without the interaction. And no one would complain!
+```{r}
+M5 <- lm(log10(ozone) ~ rad + temp + wind, data = Ozone)
+op <- par(mfrow = c(2,2))
+plot(M5)
+par(op)
+```
+# Make more sense to select the model with the lowest AIC
+```{r}
+AIC(M4,M5)
+```
+# M4 with interaction has the lowest AIC (it's negative!) [but note it is within 2 AIC points so you could go with the simple additive model]
+# plus the residual plots for M4 are slightly better
+
+Introduction to Generalised linear modelling
+
+This is essentially the same as linear modelling but you need to test for one further element - overdispersion. I'll introduce you to this test and the generation of psuedo R2 values [glms don't produce R2 out of the bag] to get you started. We'll do it using the package call performance. You'll need to install it.
+
+```{r}
+library(performance)
+```
+
+Our routine here:
+1. standard exploration work
+2. Check VIFs
+3. run glm using the correct error term
+4. test for overdispersion if you are using a poisson or binomial model
+5. If it is exists run a negative binomial model [from the library MASS]. Has the same syntax but the call command is glm.nb()
+6. Do the model selection. MuMiN will work with all variants
+7. Validate as normal
+
+Here is an example using the dataset above
+
+```{r}
+M6 <- glm(ozone ~ rad + temp + wind:temp, family=gaussian, data = Ozone) 
+summary(M6)
+```
+Check effect sizes/model performance using guesstimate R2 Nagelkerke's algorithm
+```{r}
+#check effect sizes/model performance using guesstimate R2 Nagelkerke's
+r2(M6) # 0.627
+```
+You can use MuMIn to model average the data
+```{r}
+options(na.action=na.fail) # set options in Base R concerning missing values
+M7 <- model.avg(dredge(M6, rank = "AICc")) # code introduces model.avg(), get.models and dredge functions
+options(na.action = "na.omit") # reset base R options
+summary(M7)
+```
+Give us the same outcome. Now proceed to validate as above all the code will work
+```{r}
+autoplot(M6) 
+```
+- Note autoplot cannot use model averaged elements. So do that then select the final model re-rerun as we did above and validate that one.
+
+******************************
+Let's pretend it is count data
+******************************
+
+```{r}
+M8<- glm(ozone ~ rad + temp + wind:temp, family=poisson, data = Ozone) 
+summary(M8)
+```
+Run overdispersion test
+```{r}
+#Check for over/under dispersion
+check_overdispersion(M8)
+```
+It is present. This means that the variance in the data is greater than the mean. We must control for that.The way we do it is to use the negative binomial model [it's an exponent based approach]
+
+Proceed with negative biominal model
+
+```{r}
+library(MASS)
+M9 <- glm.nb(ozone ~ rad + temp + wind:temp, data = Ozone) 
+summary(M9)
+```
+You can use MuMin to model select
+```{r}
+options(na.action=na.fail) # set options in Base R concerning missing values
+M10 <- model.avg(dredge(M9, rank = "AICc")) # code introduces model.avg(), get.models and dredge functions
+options(na.action = "na.omit") # reset base R options
+summary(M10)
+```
+As one might expect we end up with the same basic model. So select your final model. rerun it as a glm.nb and validate as above.

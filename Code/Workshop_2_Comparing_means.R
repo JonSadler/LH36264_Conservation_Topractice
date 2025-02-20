@@ -66,7 +66,7 @@ qqnorm(Ozone$O3); qqline(Ozone$O3) # The data sit on the line so we assume norma
 ggplot(Ozone, aes(sample = O3)) + stat_qq() + stat_qq_line()
 
 # We can test for this using the shapiro-wilks test
-shapiro.test(Ozone$O3) # The test returns p=0.6495 so we reject the null hypothesis (p is >0.05)
+shapiro.test(Ozone$O3) # The test returns p=0.6495 so we reject the accept hypothesis (p is >0.05)
 # NOTE - the null here is that the data are drawn from a normal distribution
 # So we want a non-significant result! The opposite of most other tests!!!!
 

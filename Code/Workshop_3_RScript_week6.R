@@ -1,5 +1,5 @@
 # ************************************************************************************
-# This is the source script for Workshop 3 [week 6]: Linear Regression + model validation + ANCOVA *
+# This is the source script for Workshop 3 [week 5]: Linear Regression + model validation + ANCOVA *
 # ************************************************************************************
 # Jon Sadler Feb 2021 modifed Feb 2024
 
@@ -18,7 +18,7 @@
 library(tidyverse)
 
 # Load compensation.csv datafile from Beckerman and Petchey's book.....see readings
-Growth <- read.csv(file.choose())
+Growth <- read.csv("~/Documents/GitHub/Teaching/LH36264_Conservation_Topractice/Workshop_data/compensation.csv")
 
   # Look at the file
 Growth 
@@ -78,7 +78,7 @@ plot(Fruit ~ Root, data = Growth,
 
 # now let's finish the graphic by adding a legend
 legend("topleft", legend = c("Grazed", "Ungrazed"),
-	pch = 21, pt.bg = c("Green", "Red"), pt.cex = 2)
+	pch = 21, pt.bg = c("Green", "Blue"), pt.cex = 2)
 
  # Repeat in ggplot2
 library(ggplot2)
@@ -98,7 +98,7 @@ ggplot(Growth, aes(x=Root, y=Fruit, colour = Grazing)) + geom_point() +
 # The experiment lasted 6 days
 
 # Load data (you should have already done this)
-Flour <- read.csv(file.choose())
+Flour <- read.csv("~/Documents/GitHub/Teaching/LH36264_Conservation_Topractice/Workshop_data/nelson.csv")
 
 # Look at it
 str(Flour)
@@ -230,7 +230,7 @@ p <- ggplot(Flour, aes(x = HUMIDITY, y = WEIGHTLOSS)) +
   stat_smooth(method = "lm", col = "red")
 
 p + annotate("text", x = 75, y = 9, label = "WEIGHTLOSS = -0.053HUMIDITY + 8.704") +
-  annotate("text", x = 56, y = 8.6, label = "R2 = 0.9975")
+  annotate("text", x = 58, y = 8.6, label = "R2 = 0.9975")
 
 # NOTE: x and y relate to the scale on the plots! Very useful. x = midpoint of text.
 # Now let's look at model validation
@@ -290,13 +290,14 @@ par(op)
 # Logan models abundance but we're going to look at species richness
 
 # load data file
-Mussel <- read.csv(file.choose())
+Mussel <- read.csv("~/Documents/GitHub/Teaching/LH36264_Conservation_Topractice/Workshop_data/mussel.csv")
 
 # Look at it
 str(Mussel)
 head(Mussel)
 
 scatterplot(SPECIES ~ AREA, data = Mussel)
+
 # This indicates that the data are not normally distributed (especially AREA)
 # The species richness data don't look too good either. Peaked in the middle.
 

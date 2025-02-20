@@ -27,16 +27,16 @@ getwd()
 # To do this we are going to use the read.csv function - there are lots of ways of doing this in R
 # From tab delineated data, xls files, SPSS files and so on. See Beckerman chp 2.
 
-Gradient <- read.csv("Gradient.csv")
+Gradient <- read.csv("~/Documents/GitHub/Teaching/LH36264_Conservation_Topractice/Workshop_data/Gradient.csv")
 
 # Look at the Gradient datafile....
 names(Gradient)
-str(Gradient) # Note one continous/numeric variable and two factor variables Site and Size
+str(Gradient) # Note one continuous/numeric variable and two factor variables Site and Size
 dim(Gradient) 
 head(Gradient) 
 tail(Gradient)
 
-View(Gradient) #NOTE - this is an RStudio function call so notice it is capitalised....
+View(Gradient) #NOTE - this is an RStudio function call so notice the first letter is capitalised....
 
 # Let's some basic plotting to understand the patterns
 
@@ -53,7 +53,7 @@ hist(Gradient$SR,
 # boxplots - useful for normality
 # The black line in the middle of the block is the median not the mean
 # The block represents the lower 25 percentile and the upper 75 percentile
-# The whiskers represent the uper and lower ranges
+# The whiskers represent the upper and lower ranges
 # so if the median line sits in the middle of the block and the 25/75%iles are evenly balance around it then we can assume
 # normality
 

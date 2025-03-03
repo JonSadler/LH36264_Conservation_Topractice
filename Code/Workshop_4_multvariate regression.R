@@ -17,7 +17,7 @@
 
 #load datafile loyn.csv - call it Loyn or the rest of the code won't work!!!!
 
-Loyn <- read.csv(file.choose())
+Loyn <- read.csv("~/Documents/GitHub/Teaching/LH36264_Conservation_Topractice/Workshop_data/loyn.csv")
 
 # Look at its structure and shape....you know the pertinent function calls!!
 
@@ -112,7 +112,7 @@ avPlots(Loyn.lm)			# This is a call to the car package
 # of North America. Ecological Applications 6: 1212–1224.
 # 73 different sites covering all of the USA (3 sites in Canada)
 
-Pareulo <- read.csv(file.choose())
+Pareulo <- read.csv("~/Documents/GitHub/Teaching/LH36264_Conservation_Topractice/Workshop_data/pareulo.csv")
 # Normality, linearity and homogeneity checks
 require(car)
 scatterplotMatrix(~ C3 + MAP + MAT + JJAMAP + DJFMAP + 
@@ -267,7 +267,7 @@ summary(Loyn.lm2)
 # in woodlands in Victoria. 
 # Because the dataset is small (<40), we use Corrected AIC (AICc)
 # NOTE: if we apply the AIC delta <2 rule the top 7 models are within 2 AIC points....all are equally likely!
-# We adopt occam's razor and go for the simplist model with two variables (Area and Grazing)
+# We adopt occam's razor and go for the simplest model with two variables (Area and Grazing)
 # We can thus use those to construct the predictive model:
 
 Loyn.lm.final <- lm(ABUND ~ log10(AREA) + GRAZE, data = Loyn)
@@ -312,3 +312,5 @@ coef(Loyn.lm.final)
 # Explanatory - rad: Solar radiation in Langleys in the frequency band 4000–7700 Angstroms from 0800-1200 hours at Central Park
 # Explanatory - wind: Average wind speed in miles per hour at 0700 and 1000 hours at LaGuardia Airport
 # Explanatory - temp: Maximum daily temperature in degrees Fahrenheit at La Guardia Airport
+
+# These data are analysed in Crawley's book. It's on the resource list.
